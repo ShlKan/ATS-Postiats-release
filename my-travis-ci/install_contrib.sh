@@ -12,3 +12,4 @@
 (cd ${PATSHOME}/contrib/ATS-extsolve-smt2 && make all && cp -f bin/patsolve_smt2 ${PATSHOME}/bin && ./bin/patsolve_smt2)
 
 
+

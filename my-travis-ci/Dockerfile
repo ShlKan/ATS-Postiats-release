@@ -19,7 +19,6 @@ ENV PATH=${PATH}:${PATSHOME}/bin
 WORKDIR ${HOME}
 RUN git clone https://github.com/ats-lang/ATS-Postiats-release/ ${HOME}/ATS-Postiats
 
-WORKDIR /tmp
 RUN (cd ${HOME}     && sh ${PATSHOME}/my-travis-ci/install_ats1.sh)
 RUN (cd ${PATSHOME} && sh ${PATSHOME}/my-travis-ci/install_ats2.sh)
 RUN (cd ${PATSHOME} && sh ${PATSHOME}/my-travis-ci/install_contrib.sh)
