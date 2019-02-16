@@ -13,12 +13,12 @@
 ** the terms of  the GNU GENERAL PUBLIC LICENSE (GPL) as published by the
 ** Free Software Foundation; either version 3, or (at  your  option)  any
 ** later version.
-** 
+**
 ** ATS is distributed in the hope that it will be useful, but WITHOUT ANY
 ** WARRANTY; without  even  the  implied  warranty  of MERCHANTABILITY or
 ** FITNESS FOR A PARTICULAR PURPOSE.  See the  GNU General Public License
 ** for more details.
-** 
+**
 ** You  should  have  received  a  copy of the GNU General Public License
 ** along  with  ATS;  see the  file COPYING.  If not, please write to the
 ** Free Software Foundation,  51 Franklin Street, Fifth Floor, Boston, MA
@@ -150,21 +150,27 @@ datatype lexsym =
   | LS_REF of () // 'ref@' is removed
 *)
 //
+  | LS_T of () // for t@ype
+  | LS_VT of () // for vt@ype
+//
   | LS_PROP of () // for prop+ and prop-
   | LS_VIEW of () // for view+ and view- and view@
 //
   | LS_TYPE of () // for type+ and type-
+  | LS_TBOX of () // for tbox+ and tbox-
+  | LS_TFLT of () // for tflt+ and tflt-
+//
   | LS_TYPES of () // for types+ and types-
-  | LS_VIEWTYPE of () // for viewtype+ and viewtype-
 //
-  | LS_T of () // for t@ype
-  | LS_T0YPE of () // for t0ype+ and t0ype-
-//
-  | LS_VT of () // for vt@ype
   | LS_VTYPE of () // for vtype+ and vtype-
+  | LS_VTBOX of () // for vtbox+ and vtbox-
+  | LS_VTFLT of () // for vtflt+ and vtflt-
+//
+  | LS_T0YPE of () // for t0ype+ and t0ype-
   | LS_VT0YPE of () // for vt0ype+ and vt0ype-
 //
   | LS_VIEWT of () // for viewt@ype
+  | LS_VIEWTYPE of () // for viewtype+ and viewtype-
   | LS_VIEWT0YPE of () // for viewt0ype+ and viewt0ype-
 //
   | LS_ABST of () // for abst@ype
@@ -281,20 +287,27 @@ val () = insert (ptbl, "fix", LS_FIX)
 val () = insert (ptbl, "ref", LS_REF) // 'ref@' removed
 *)
 //
+val () = insert (ptbl, "t", LS_T)
+val () = insert (ptbl, "vt", LS_VT)
+//
 val () = insert (ptbl, "prop", LS_PROP)
 val () = insert (ptbl, "view", LS_VIEW)
+//
 val () = insert (ptbl, "type", LS_TYPE)
+val () = insert (ptbl, "tbox", LS_TBOX)
+val () = insert (ptbl, "tflt", LS_TFLT)
+//
 val () = insert (ptbl, "types", LS_TYPES)
-val () = insert (ptbl, "viewtype", LS_VIEWTYPE)
 //
-val () = insert (ptbl, "t", LS_T)
-val () = insert (ptbl, "t0ype", LS_T0YPE) // = t@ype
-//
-val () = insert (ptbl, "vt", LS_VT)
 val () = insert (ptbl, "vtype", LS_VTYPE)
+val () = insert (ptbl, "vtbox", LS_VTBOX)
+val () = insert (ptbl, "vtflt", LS_VTFLT)
+//
+val () = insert (ptbl, "t0ype", LS_T0YPE) // = t@ype
 val () = insert (ptbl, "vt0ype", LS_VT0YPE) // = vt@ype
 //
 val () = insert (ptbl, "viewt", LS_VIEWT)
+val () = insert (ptbl, "viewtype", LS_VIEWTYPE)
 val () = insert (ptbl, "viewt0ype", LS_VIEWT0YPE) // = viewt@ype
 //
 val () = insert (ptbl, "abst", LS_ABST)
@@ -501,7 +514,7 @@ fun SIGN_test
 
 local
 //
-#define ESCAPED "ntvbrfa\\\?\'\"\(\[\{"
+#define ESCAPED "ntvbrfa\\\?\'\"()[]{}"
 //
 in(*in-of-local*)
 //
@@ -587,7 +600,7 @@ val nchr1 = loop (buf, nchr0, f)
 //
 val diff = nchr1 - nchr0
 val () =
-if diff > 0u 
+if diff > 0u
   then $LOC.position_incby_count (pos, diff) else ()
 // end of [if]
 //
@@ -704,7 +717,7 @@ fun loop
 , nchr: uint, lit: string n, k: size_t k
 ) : int = let
   val isnot = string_isnot_atend (lit, k)
-in 
+in
 //
 if
 isnot
@@ -810,7 +823,7 @@ val nchr0 =
 val nchr1 = loop (buf, nchr0)
 val diff = nchr1 - nchr0
 val () =
-if diff > 0u 
+if diff > 0u
   then $LOC.position_incby_count (pos, diff) else ()
 // end of [val]
 } (* end of [testing_octalseq0] *)
@@ -941,7 +954,9 @@ fun
 testing_deciexp
 (
   buf: &lexbuf, pos: &position
-) : int = let  
+) : int = let
+// YD: if the integral part is empty, then the fractional part is not,
+// and the other way too. There is no need to check it.
 //
 val i = lexbufpos_get_char (buf, pos)
 //
@@ -991,8 +1006,9 @@ end // end of [testing_deciexp]
 fun
 testing_hexiexp
 (
-  buf: &lexbuf, pos: &position
-) : int = let  
+  buf: &lexbuf
+, pos: &position, int_size: uint
+) : int = let
 //
 val i = lexbufpos_get_char (buf, pos)
 //
@@ -1008,10 +1024,35 @@ if
 c = '.'
 then let
   val () = posincby1 (pos)
-  val k1 = testing_xdigitseq0 (buf, pos)
-  val k2 = testing_fexponent_bin (buf, pos)
+  //
+  // YD: nb of digits after the dot:
+  //
+  val k1 =
+    testing_xdigitseq0 (buf, pos)
+  val k2 =
+    testing_fexponent_bin (buf, pos)
+  val () =
+  if
+  (int_size = 0u && k1 = 0u)
+  then {
+    // YD-2018-07-10: fix hex float format.
+    val loc =
+      lexbufpos_get_location (buf, pos)
+    val err =
+      lexerr_make (loc, LE_FINTFRAC_missing)
+    val ((*void*)) = the_lexerrlst_add (err)
+  } (* end of [if] *)
 in
-  if k2 >= 0 then (u2i)k1 + k2 + 1 else (u2i)k1 + 1
+  if k2 >= 0 then (u2i)k1 + k2 + 1
+  else let // YD-2018-07-09: fix hex float format.
+    val loc =
+      lexbufpos_get_location (buf, pos)
+    val err =
+      lexerr_make (loc, LE_FEXPONENT_missing)
+    val ((*void*)) = the_lexerrlst_add (err)
+  in (u2i)k1 + 1
+  end // end of [else]
+
 end // end of [then]
 else (~1) // end of [else]
 //
@@ -1205,9 +1246,10 @@ feof
 , pos: &position
 , xs: list_vt (position, l)
 ) : token = let
-  val list_vt_cons (!p_x, _) = xs
-  val loc = $LOC.location_make_pos_pos (!p_x, pos)
-  prval () = fold@ (xs)
+  val list_vt_cons(!p_x, _) = xs
+  val loc =
+    $LOC.location_make_pos_pos(!p_x, pos)
+prval () = fold@ (xs)
   val () = list_vt_free (xs)
   val err = lexerr_make (loc, LE_COMMENT_block_unclose)
   val () = the_lexerrlst_add (err)
@@ -1264,7 +1306,7 @@ end // end of [lexing_COMMENT_block_ml]
 implement
 lexing_COMMENT_rest
   (buf, pos) = let
-  val i = lexbufpos_get_char (buf, pos)  
+  val i = lexbufpos_get_char (buf, pos)
 in
   if i >= 0 then let
     val () = posincbyc (pos, i) in
@@ -1343,7 +1385,7 @@ then let
     if c2 = '2' then (knd := knd + 1; posincby1(pos))
   end // end of [val]
   val () =
-    if knd = DYNEND then let // for $^2
+    if knd = DYNEND then let // for $2
     val i2 = lexbufpos_get_char (buf, pos)
     val c2 = (i2c)i2
   in
@@ -1608,7 +1650,7 @@ case+ 0 of
 | _ => lexbufpos_token_reset (buf, pos, DOT)
 //
 end // end of [lexing_DOT]
-  
+
 (* ****** ****** *)
 
 extern
@@ -1621,7 +1663,7 @@ lexing_PERCENT
   val i = lexbufpos_get_char (buf, pos)
   val c = (i2c)i
 in
-  case+ c of 
+  case+ c of
   | '\(' => let // '%(' initiates macro syntax
       val () = posincby1 (pos) in
       lexbufpos_token_reset (buf, pos, T_PERCENTLPAREN)
@@ -1708,7 +1750,7 @@ lexing_BQUOTE
   val i = lexbufpos_get_char (buf, pos)
   val c = (i2c)i
 in
-  case+ c of 
+  case+ c of
   | '\(' => let // '`(' initiates macro syntax
       val () = posincby1 (pos) in
       lexbufpos_token_reset (buf, pos, T_BQUOTELPAREN)
@@ -1816,7 +1858,10 @@ in
       // end of [if]
     end // end of [_ when ...]
   | _ => let
+(*
       val k = testing_digitseq0 (buf, pos)
+*)
+      val k = testing_octalseq0 (buf, pos)
     in
       if k = 0u then
         lexbufpos_lexerr_reset (buf, pos, LE_CHAR_oct)
@@ -2060,7 +2105,7 @@ else let
 end (* end of [else] *)
 //
 end // end of [loop]
-//  
+//
 and
 loop_ins
 {m,n:int | m > 0}
@@ -2177,7 +2222,7 @@ lexing_CASE
 fun lexing_VAL
 (
   buf: &lexbuf, pos: &position
-) : token = 
+) : token =
   lexing_polarity (buf, pos, VAL, VAL_pos, VAL_neg)
 // end of [lexing_VAL]
 
@@ -2190,6 +2235,21 @@ lexing_TYPE
 ) : token =
   lexing_polarity (buf, pos, TYPE, TYPE_pos, TYPE_neg)
 // end of [lexing_TYPE]
+fun
+lexing_TBOX
+(
+  buf: &lexbuf, pos: &position
+) : token =
+  lexing_polarity (buf, pos, TBOX, TYPE_pos, TYPE_neg)
+// end of [lexing_TBOX]
+fun
+lexing_TFLT
+(
+  buf: &lexbuf, pos: &position
+) : token =
+  lexing_polarity (buf, pos, TFLT, T0YPE_pos, T0YPE_neg)
+// end of [lexing_TBOX]
+//
 fun
 lexing_T0YPE
 (
@@ -2240,6 +2300,28 @@ in
     end
   | _ => lexbufpos_token_reset (buf, pos, VIEW)
 end // end of [lexing_VIEW]
+//
+fun
+lexing_VTYPE
+(
+  buf: &lexbuf, pos: &position
+) : token =
+  lexing_polarity (buf, pos, VTYPE, VIEWTYPE_pos, VIEWTYPE_neg)
+// end of [lexing_VTYPE]
+fun
+lexing_VTBOX
+(
+  buf: &lexbuf, pos: &position
+) : token =
+  lexing_polarity (buf, pos, VTBOX, VIEWTYPE_pos, VIEWTYPE_neg)
+// end of [lexing_VTBOX]
+fun
+lexing_VTFLT
+(
+  buf: &lexbuf, pos: &position
+) : token =
+  lexing_polarity (buf, pos, VTFLT, VIEWT0YPE_pos, VIEWT0YPE_neg)
+// end of [lexing_VTBOX]
 //
 fun
 lexing_VIEWTYPE
@@ -2371,59 +2453,73 @@ case+ sym of
   end
 | LS_ABSVIEWT () when
     testing_literal (buf, pos, "@ype") >= 0 => let
-    val () = strptr_free (mystr) in
+    val () = strptr_free(mystr) in
     lexbufpos_token_reset (buf, pos, ABSVIEWT0YPE)
   end
 //
 | LS_CASE () => let
-    val () = strptr_free (mystr) in lexing_CASE (buf, pos)
+    val () = strptr_free(mystr) in lexing_CASE (buf, pos)
   end // end of [LS_CASE]
 //
-| LS_PROP () => let
-    val () = strptr_free (mystr) in lexing_PROP (buf, pos)
-  end // end of [LS_PROP]
-//
-| LS_T () when
-    testing_literal (buf, pos, "@ype") >= 0 => let
-    val () = strptr_free (mystr) in lexing_T0YPE (buf, pos)
+| LS_T() when
+    testing_literal(buf, pos, "@ype") >= 0 => let
+    val () = strptr_free(mystr) in lexing_T0YPE(buf, pos)
   end // end of [LS_T]
+| LS_VT() when
+    testing_literal(buf, pos, "@ype") >= 0 => let
+    val () = strptr_free(mystr) in lexing_VIEWT0YPE(buf, pos)
+  end // end of [LS_VT]
 //
-| LS_TYPE () => let
-    val () = strptr_free (mystr) in lexing_TYPE (buf, pos)
+| LS_PROP() => let
+    val () = strptr_free(mystr) in lexing_PROP(buf, pos)
+  end // end of [LS_PROP]
+| LS_VIEW() => let
+    val () = strptr_free(mystr) in lexing_VIEW(buf, pos)
+  end// end of [LS_VIEW]
+//
+| LS_TYPE() => let
+    val () = strptr_free(mystr) in lexing_TYPE(buf, pos)
   end // end of [LS_TYPE]
-| LS_T0YPE () => let
-    val () = strptr_free (mystr) in lexing_T0YPE (buf, pos)
-  end // end of [LS_T0YPE]
+| LS_TBOX() => let
+    val () = strptr_free(mystr) in lexing_TBOX(buf, pos)
+  end // end of [LS_TBOX]
+| LS_TFLT() => let
+    val () = strptr_free(mystr) in lexing_TFLT(buf, pos)
+  end // end of [LS_TFLT]
+//
 (*
-| LS_TYPES () => let
-    val () = strptr_free (mystr) in lexing_TYPES (buf, pos)
+| LS_TYPES() => let
+    val () = strptr_free(mystr) in lexing_TYPES (buf, pos)
   end // end of [LS_TYPES]
 *)
 //
-| LS_VT () when
-    testing_literal (buf, pos, "@ype") >= 0 => let
-    val () = strptr_free (mystr) in lexing_VIEWT0YPE (buf, pos)
-  end
-| LS_VTYPE () => let
-    val () = strptr_free (mystr) in lexing_VIEWTYPE (buf, pos)
-  end
-| LS_VT0YPE () => let
-    val () = strptr_free (mystr) in lexing_VIEWT0YPE (buf, pos)
-  end
+| LS_VTYPE() => let
+    val () = strptr_free(mystr) in lexing_VTYPE(buf, pos)
+  end // end of [LS_VTYPE]
+| LS_VTBOX() => let
+    val () = strptr_free(mystr) in lexing_VTBOX(buf, pos)
+  end // end of [LS_VTBOX]
+| LS_VTFLT() => let
+    val () = strptr_free(mystr) in lexing_VTFLT(buf, pos)
+  end // end of [LS_VTFLT]
 //
-| LS_VIEW () => let
-    val () = strptr_free (mystr) in lexing_VIEW (buf, pos)
-  end
-| LS_VIEWT () when
-    testing_literal (buf, pos, "@ype") >= 0 => let
-    val () = strptr_free (mystr) in lexing_VIEWT0YPE (buf, pos)
-  end
-| LS_VIEWTYPE () => let
-    val () = strptr_free (mystr) in lexing_VIEWTYPE (buf, pos)
-  end
-| LS_VIEWT0YPE () => let
-    val () = strptr_free (mystr) in lexing_VIEWT0YPE (buf, pos)
-  end
+| LS_T0YPE() => let
+    val () = strptr_free(mystr) in lexing_T0YPE(buf, pos)
+  end // end of [LS_T0YPE]
+| LS_VT0YPE() => let
+    val () = strptr_free(mystr) in lexing_VIEWT0YPE(buf, pos)
+  end // end of [LS_VT0YPE]
+//
+| LS_VIEWT() when
+    testing_literal(buf, pos, "@ype") >= 0 => let
+    val () = strptr_free(mystr) in lexing_VIEWT0YPE(buf, pos)
+  end // end of [LS_VIEWT]
+| LS_VIEWTYPE() => let
+    val () = strptr_free(mystr) in lexing_VIEWTYPE(buf, pos)
+  end // end of [LS_VIEWTYPE]
+| LS_VIEWT0YPE() => let
+    val () = strptr_free(mystr) in lexing_VIEWT0YPE(buf, pos)
+  end // end of [LS_VIEWT0YPE]
 //
 | LS_VAL () => let
     val () = strptr_free (mystr) in lexing_VAL (buf, pos)
@@ -2713,13 +2809,19 @@ in
 case+ 0 of
 | _ when
     testing_hexiexp
-      (buf, pos) >= 0 => let
+      (buf, pos, k1) >= 0 => let
   in
     lexing_FLOAT_hexiexp (buf, pos)
   end // end of [_ when ...]
 | _ when
     testing_fexponent_bin
       (buf, pos) >= 0 => let
+      val () = if k1 = 0u then {
+        // YD-2018-07-10: fix hex float format.
+        val loc = lexbufpos_get_location (buf, pos)
+        val err = lexerr_make (loc, LE_FINTFRAC_missing)
+        val () = the_lexerrlst_add (err)
+      }
   in
     lexing_FLOAT_hexiexp (buf, pos)
   end // end of [_ when ...]
@@ -2727,6 +2829,12 @@ case+ 0 of
     val k2 = testing_intspseq0 (buf, pos)
     val str = lexbufpos_get_strptr1 (buf, pos)
     val str = string_of_strptr (str)
+    val () = if k1 = 0u then {
+      // YD-2018-07-10: fix hex int format.
+      val loc = lexbufpos_get_location (buf, pos)
+      val err = lexerr_make (loc, LE_IDIGITS_empty)
+      val () = the_lexerrlst_add (err)
+    }
   in
     lexbufpos_token_reset (buf, pos, T_INT_hex(str, k2))
   end // end of [_]
