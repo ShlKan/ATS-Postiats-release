@@ -1,12 +1,11 @@
-# [ATS2](http://www.ats-lang.org/) - ATS/Postiats
+# [ATS-Smart]
 
-A Programming Language System to Unleash the Potentials of Types
+A Programming Language System for Smart Contracts to Unleash the Potentials of Types
 and Templates
 
 ## Project Description
 
-ATS/Postiats (or ATS2/Postiats) is the name for the current compiler
-of ATS2, the successor of ATS (or ATS1).
+ATS-Smart
 
 The actual implementation of ATS/Postiats started in the March of
 2011, and it took about two and one-half years to reach the first
